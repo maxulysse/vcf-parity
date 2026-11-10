@@ -2,7 +2,7 @@
 
 Field-level comparison of two VCF files.
 
-Accuracy tools (hap.py, RTG vcfeval, Truvari, Aardvark) score calls against a truth set.
+Accuracy tools ([hap.py](https://github.com/Illumina/hap.py), [RTG vcfeval](https://github.com/RealTimeGenomics/rtg-tools), [Truvari](https://github.com/ACEnglish/truvari), [Aardvark](https://github.com/PacificBiosciences/aardvark)) score calls against a truth set.
 vcf-parity answers a different question: do two VCFs carry the same records with the same values?
 Use it to compare a caller against a reference implementation, BAM against CRAM input, one platform against another, or a release against the previous one.
 
