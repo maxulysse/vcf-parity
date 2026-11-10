@@ -1,0 +1,9 @@
+[package]
+name = "vcf-parity"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Field-level comparison of two VCF files"
+repository = "https://github.com/maxulysse/vcf-parity"
+
+[dependencies]
