@@ -1,15 +1,12 @@
 # vcf-parity
 
-Field-level comparison of two VCF files: do they carry the same records with the same values?
+Compares two VCF files record by record and field by field.
 
 ```console
 vcf-parity a.vcf.gz b.vcf.gz > discrepancies.tsv
 ```
 
-Documentation: [docs](docs/README.md).
+Exit code `0` when the files match, `1` when they differ, `2` on error.
+See the [documentation](docs/README.md).
 
-Status: early development.
-
-## License
-
-[MIT](LICENSE)
+Early development. [MIT](LICENSE) license.
