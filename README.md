@@ -1,3 +1,5 @@
+<img src="docs/images/logo.svg" alt="vcf-parity logo" width="96" align="right">
+
 # vcf-parity
 
 Compares two VCF files record by record and field by field.
