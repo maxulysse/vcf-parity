@@ -69,6 +69,8 @@ pub struct Inputs {
     pub names_a: Vec<String>,
     pub names_b: Vec<String>,
     pub shared_samples: Vec<String>,
+    /// Header types of each INFO and FORMAT key, from both files, keyed as `INFO/<key>` or `FORMAT/<key>`.
+    pub declared_types: HashMap<String, Vec<String>>,
 }
 
 pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
@@ -78,6 +80,11 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
     let mut order = ContigOrder(HashMap::new());
     for name in header_a.contigs().keys().chain(header_b.contigs().keys()) {
         order.index(name);
+    }
+
+    let mut declared_types = HashMap::new();
+    for header in [&header_a, &header_b] {
+        declared(header, &mut declared_types);
     }
 
     let names = |h: &vcf::Header| -> Vec<String> { h.sample_names().iter().cloned().collect() };
@@ -105,7 +112,23 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
         names_a,
         names_b,
         shared_samples,
+        declared_types,
     })
+}
+
+fn declared(header: &vcf::Header, types: &mut HashMap<String, Vec<String>>) {
+    for (key, info) in header.infos() {
+        types
+            .entry(format!("INFO/{key}"))
+            .or_default()
+            .push(format!("{:?}", info.ty()));
+    }
+    for (key, format) in header.formats() {
+        types
+            .entry(format!("FORMAT/{key}"))
+            .or_default()
+            .push(format!("{:?}", format.ty()));
+    }
 }
 
 fn open(path: &str) -> io::Result<(vcf::io::Reader<Box<dyn BufRead>>, vcf::Header)> {

@@ -1,0 +1,10 @@
+##fileformat=VCFv4.1
+##contig=<ID=chr1,length=248956422>
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele frequency">
+##INFO=<ID=SOURCE,Number=1,Type=String,Description="Call source">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S1
+chr1	100	.	A	C	30.5	PASS	AF=0.50;SOURCE=x	GT:GQ:AD	0/1:41:10,13
+chr1	200	.	G	T	50	PASS	AF=0.2500001;SOURCE=x	GT:GQ:AD	0/1:30:5,5,5

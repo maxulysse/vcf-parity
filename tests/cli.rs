@@ -84,3 +84,95 @@ fn version_and_help_exit_zero() {
 fn wrong_arguments_exit_two() {
     assert_eq!(vcf_parity(&["only-one.vcf"]).status.code(), Some(2));
 }
+
+fn run_with(a: &str, b: &str, tolerances: &[&str]) -> Output {
+    let mut args = vec![format!("tests/data/{a}"), format!("tests/data/{b}")];
+    for t in tolerances {
+        args.push("--tolerance".to_string());
+        args.push(t.to_string());
+    }
+    vcf_parity(&args.iter().map(String::as_str).collect::<Vec<_>>())
+}
+
+#[test]
+fn tolerances_hide_close_values() {
+    let out = run_with(
+        "numeric_a.vcf",
+        "numeric_b.vcf",
+        &[
+            "QUAL=abs:0.5",
+            "INFO/AF=rel:1e-6",
+            "FORMAT/GQ=abs:1",
+            "FORMAT/AD=abs:1",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b\n\
+         chr1\t200\tG\tT\tS1\tFORMAT/GQ\tdiffers\t.\t30\n\
+         chr1\t200\tG\tT\tS1\tFORMAT/AD\tdiffers\t5,5\t5,5,5\n"
+    );
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("2 field differences, 5 field differences within tolerance")
+    );
+}
+
+#[test]
+fn values_within_tolerance_exit_zero() {
+    let out = run_with("a.vcf", "a.vcf", &["QUAL=abs:1"]);
+    assert_eq!(out.status.code(), Some(0));
+    let out = run_with(
+        "numeric_a.vcf",
+        "numeric_b.vcf",
+        &[
+            "QUAL=abs:1",
+            "INFO/AF=abs:0.001",
+            "FORMAT/GQ=abs:100",
+            "FORMAT/AD=abs:1",
+        ],
+    );
+    // A missing value and a list of another length still differ.
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
+fn exact_tolerance_compares_numbers() {
+    let out = run_with("numeric_a.vcf", "numeric_b.vcf", &["INFO/AF=exact"]);
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(!stdout.contains("chr1\t100\tA\tC\t.\tINFO/AF"));
+    assert!(stdout.contains("chr1\t200\tG\tT\t.\tINFO/AF\tdiffers\t0.25\t0.2500001"));
+}
+
+#[test]
+fn invalid_tolerances_exit_two() {
+    for tolerance in [
+        "QUAL",
+        "QUAL=near:1",
+        "ID=abs:1",
+        "FORMAT/GT=abs:1",
+        "INFO/SOURCE=abs:1",
+    ] {
+        let out = run_with("numeric_a.vcf", "numeric_b.vcf", &[tolerance]);
+        assert_eq!(out.status.code(), Some(2), "{tolerance}");
+    }
+    let out = run_with(
+        "numeric_a.vcf",
+        "numeric_b.vcf",
+        &["QUAL=abs:1", "QUAL=abs:2"],
+    );
+    assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn undeclared_tolerance_field_warns() {
+    let out = run_with("numeric_a.vcf", "numeric_b.vcf", &["INFO/NOPE=abs:1"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("INFO/NOPE is not declared in either header")
+    );
+}
