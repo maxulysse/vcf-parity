@@ -2,6 +2,8 @@
 
 ```console
 vcf-parity a.vcf.gz b.vcf.gz > discrepancies.tsv
+vcf-parity --help
+vcf-parity --version
 ```
 
 ## Inputs

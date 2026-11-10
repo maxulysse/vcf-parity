@@ -62,3 +62,19 @@ fn missing_sample_column_is_an_error() {
             .contains("fewer sample columns")
     );
 }
+
+#[test]
+fn version_and_help_exit_zero() {
+    for flag in ["--version", "-V", "--help", "-h"] {
+        let out = Command::new(env!("CARGO_BIN_EXE_vcf-parity"))
+            .arg(flag)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "{flag}");
+        let stdout = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            stdout.starts_with(&format!("vcf-parity {}", env!("CARGO_PKG_VERSION"))),
+            "{flag}"
+        );
+    }
+}
