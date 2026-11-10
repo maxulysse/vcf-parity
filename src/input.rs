@@ -12,13 +12,19 @@ pub enum Scope {
     Sample(usize),
 }
 
+pub struct Field {
+    pub scope: Scope,
+    pub name: String,
+    pub value: String,
+}
+
 pub struct Record {
     pub contig: usize,
     pub chrom: String,
     pub pos: usize,
     pub reference: String,
     pub alternate: String,
-    pub fields: Vec<((Scope, String), String)>,
+    pub fields: Vec<Field>,
 }
 
 impl Record {
@@ -32,10 +38,10 @@ impl Record {
 }
 
 /// Contig order for merging and sort checks: `##contig` lines of a, then of b, then first appearance in the records.
-pub struct ContigOrder(pub HashMap<String, usize>);
+pub struct ContigOrder(HashMap<String, usize>);
 
 impl ContigOrder {
-    pub fn index(&mut self, name: &str) -> usize {
+    fn index(&mut self, name: &str) -> usize {
         if let Some(&i) = self.0.get(name) {
             return i;
         }
@@ -46,16 +52,63 @@ impl ContigOrder {
 }
 
 pub struct Input {
-    pub path: String,
-    pub reader: vcf::io::Reader<Box<dyn BufRead>>,
-    pub buf: vcf::Record,
+    path: String,
+    reader: vcf::io::Reader<Box<dyn BufRead>>,
+    buf: vcf::Record,
     /// Column of each shared sample in this file.
-    pub sample_columns: Vec<usize>,
-    pub next: Option<Record>,
-    pub last_key: (usize, usize),
+    sample_columns: Vec<usize>,
+    next: Option<Record>,
+    last_key: (usize, usize),
 }
 
-pub fn open(path: &str) -> io::Result<(vcf::io::Reader<Box<dyn BufRead>>, vcf::Header)> {
+/// Both inputs, opened together: contig order and shared samples depend on both headers.
+pub struct Inputs {
+    pub a: Input,
+    pub b: Input,
+    pub order: ContigOrder,
+    pub names_a: Vec<String>,
+    pub names_b: Vec<String>,
+    pub shared_samples: Vec<String>,
+}
+
+pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
+    let (reader_a, header_a) = open(path_a)?;
+    let (reader_b, header_b) = open(path_b)?;
+
+    let mut order = ContigOrder(HashMap::new());
+    for name in header_a.contigs().keys().chain(header_b.contigs().keys()) {
+        order.index(name);
+    }
+
+    let names = |h: &vcf::Header| -> Vec<String> { h.sample_names().iter().cloned().collect() };
+    let (names_a, names_b) = (names(&header_a), names(&header_b));
+    let shared_samples: Vec<String> = names_a
+        .iter()
+        .filter(|n| names_b.contains(n))
+        .cloned()
+        .collect();
+    let input = |path: &str, reader, names: &[String]| Input {
+        path: path.to_string(),
+        reader,
+        buf: vcf::Record::default(),
+        sample_columns: shared_samples
+            .iter()
+            .map(|s| names.iter().position(|n| n == s).unwrap())
+            .collect(),
+        next: None,
+        last_key: (0, 0),
+    };
+    Ok(Inputs {
+        a: input(path_a, reader_a, &names_a),
+        b: input(path_b, reader_b, &names_b),
+        order,
+        names_a,
+        names_b,
+        shared_samples,
+    })
+}
+
+fn open(path: &str) -> io::Result<(vcf::io::Reader<Box<dyn BufRead>>, vcf::Header)> {
     let mut reader = vcf::io::reader::Builder::default()
         .build_from_path(path)
         .map_err(|e| with_path(path, e))?;
@@ -68,7 +121,7 @@ fn with_path(path: &str, e: io::Error) -> io::Error {
 }
 
 impl Input {
-    pub fn read(&mut self, order: &mut ContigOrder) -> io::Result<Option<Record>> {
+    fn read(&mut self, order: &mut ContigOrder) -> io::Result<Option<Record>> {
         let path = &self.path;
         if self
             .reader
@@ -78,8 +131,9 @@ impl Input {
         {
             return Ok(None);
         }
+        let contig = order.index(self.buf.reference_sequence_name());
         let record =
-            flatten(&self.buf, &self.sample_columns, order).map_err(|e| with_path(path, e))?;
+            flatten(&self.buf, contig, &self.sample_columns).map_err(|e| with_path(path, e))?;
         if record.key() < self.last_key {
             let message = format!(
                 "records are not sorted at {}:{} (contig order follows the ##contig lines of the first file)",
@@ -116,14 +170,13 @@ impl Input {
     }
 }
 
-pub fn flatten(
-    r: &vcf::Record,
-    sample_columns: &[usize],
-    order: &mut ContigOrder,
-) -> io::Result<Record> {
-    let site = |field: &str, value: &str| {
-        let value = if value.is_empty() { MISSING } else { value };
-        ((Scope::Site, field.to_string()), value.to_string())
+fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Result<Record> {
+    let chrom = r.reference_sequence_name();
+    let pos = r.variant_start().transpose()?.map_or(0, usize::from);
+    let site = |name: &str, value: &str| Field {
+        scope: Scope::Site,
+        name: name.to_string(),
+        value: if value.is_empty() { MISSING } else { value }.to_string(),
     };
     let qual = r.quality_score().transpose()?.map(|q| q.to_string());
     let mut fields = vec![
@@ -146,24 +199,26 @@ pub fn flatten(
     let keys: Vec<&str> = samples.keys().iter().collect();
     let values: Vec<_> = samples.iter().collect();
     for (shared, &column) in sample_columns.iter().enumerate() {
-        let Some(sample) = values.get(column) else {
-            continue;
-        };
+        let sample = values.get(column).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{chrom}:{pos}: fewer sample columns than in the header"),
+            )
+        })?;
         let sample_values: Vec<&str> = sample.as_ref().split(':').collect();
         for (i, key) in keys.iter().enumerate() {
-            let value = sample_values.get(i).copied().unwrap_or(MISSING);
-            fields.push((
-                (Scope::Sample(shared), format!("FORMAT/{key}")),
-                value.to_string(),
-            ));
+            fields.push(Field {
+                scope: Scope::Sample(shared),
+                name: format!("FORMAT/{key}"),
+                value: sample_values.get(i).copied().unwrap_or(MISSING).to_string(),
+            });
         }
     }
 
-    let chrom = r.reference_sequence_name();
     Ok(Record {
-        contig: order.index(chrom),
+        contig,
         chrom: chrom.to_string(),
-        pos: r.variant_start().transpose()?.map_or(0, usize::from),
+        pos,
         reference: r.reference_bases().to_string(),
         alternate: r.alternate_bases().as_ref().to_string(),
         fields,

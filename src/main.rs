@@ -1,13 +1,10 @@
 mod input;
 mod pair;
 
-use std::collections::HashMap;
 use std::io::{self, BufWriter, StdoutLock, Write};
 use std::process::ExitCode;
 
-use noodles::vcf;
-
-use input::{ContigOrder, Input, Record, Scope, open};
+use input::{Inputs, Record, Scope, open_pair};
 use pair::{Pair, pair_by};
 
 const USAGE: &str = "usage: vcf-parity <a.vcf[.gz]> <b.vcf[.gz]>";
@@ -20,7 +17,13 @@ struct Counts {
     only_a: usize,
     only_b: usize,
     samples: usize,
-    rows: usize,
+    fields: usize,
+}
+
+impl Counts {
+    fn any(&self) -> bool {
+        self.only_a + self.only_b + self.samples + self.fields > 0
+    }
 }
 
 struct Report {
@@ -38,7 +41,6 @@ impl Report {
         field: &str,
         values: Pair<&str>,
     ) -> io::Result<()> {
-        self.counts.rows += 1;
         let (kind, a, b) = match values {
             Pair::Both(a, b) => ("differs", a, b),
             Pair::OnlyA(a) => ("missing_in_b", a, MISSING),
@@ -91,55 +93,40 @@ impl Report {
 
     fn fields(&mut self, a: &Record, b: &Record) -> io::Result<()> {
         self.counts.compared += 1;
-        for pair in pair_by(&a.fields, &b.fields, |x, y| x.0 == y.0) {
+        for pair in pair_by(&a.fields, &b.fields, |x, y| {
+            x.scope == y.scope && x.name == y.name
+        }) {
             if let Pair::Both(x, y) = &pair
-                && x.1 == y.1
+                && x.value == y.value
             {
                 continue;
             }
-            let (scope, field) = &pair.either().0;
-            let sample = match *scope {
+            self.counts.fields += 1;
+            let field = pair.either();
+            let sample = match field.scope {
                 Scope::Site => MISSING.to_string(),
                 Scope::Sample(i) => self.shared_samples[i].clone(),
             };
-            self.emit(Some(a), &sample, field, pair.map(|f| f.1.as_str()))?;
+            self.emit(
+                Some(a),
+                &sample,
+                &field.name,
+                pair.map(|f| f.value.as_str()),
+            )?;
         }
         Ok(())
     }
 }
 
 fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
-    let (reader_a, header_a) = open(path_a)?;
-    let (reader_b, header_b) = open(path_b)?;
-
-    let mut order = ContigOrder(HashMap::new());
-    for name in header_a.contigs().keys().chain(header_b.contigs().keys()) {
-        order.index(name);
-    }
-
-    let names_a: Vec<String> = header_a.sample_names().iter().cloned().collect();
-    let names_b: Vec<String> = header_b.sample_names().iter().cloned().collect();
-    let shared_samples: Vec<String> = names_a
-        .iter()
-        .filter(|n| names_b.contains(n))
-        .cloned()
-        .collect();
-    let columns = |names: &[String]| -> Vec<usize> {
-        shared_samples
-            .iter()
-            .map(|s| names.iter().position(|n| n == s).unwrap())
-            .collect()
-    };
-    let input = |path: &str, reader, names: &[String]| Input {
-        path: path.to_string(),
-        reader,
-        buf: vcf::Record::default(),
-        sample_columns: columns(names),
-        next: None,
-        last_key: (0, 0),
-    };
-    let mut a = input(path_a, reader_a, &names_a);
-    let mut b = input(path_b, reader_b, &names_b);
+    let Inputs {
+        mut a,
+        mut b,
+        mut order,
+        names_a,
+        names_b,
+        shared_samples,
+    } = open_pair(path_a, path_b)?;
 
     let mut report = Report {
         out: BufWriter::new(io::stdout().lock()),
@@ -179,13 +166,9 @@ fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
     let c = &report.counts;
     eprintln!(
         "vcf-parity: {} records compared, {} only in a, {} only in b, {} field differences, {} samples in one file only",
-        c.compared,
-        c.only_a,
-        c.only_b,
-        c.rows - c.only_a - c.only_b - c.samples,
-        c.samples
+        c.compared, c.only_a, c.only_b, c.fields, c.samples
     );
-    Ok(c.rows > 0)
+    Ok(c.any())
 }
 
 fn main() -> ExitCode {

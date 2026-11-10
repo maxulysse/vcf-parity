@@ -51,3 +51,14 @@ fn unsorted_input_is_an_error() {
             .contains("not sorted")
     );
 }
+
+#[test]
+fn missing_sample_column_is_an_error() {
+    let out = run("b.vcf", "missing_sample.vcf");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("fewer sample columns")
+    );
+}
