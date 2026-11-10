@@ -1,4 +1,4 @@
-<img src="docs/images/logo.svg" alt="vcf-parity logo" width="96" align="right">
+<p align="center"><img src="docs/images/logo.svg" alt="vcf-parity logo" width="128"></p>
 
 # vcf-parity
 
