@@ -1,10 +1,14 @@
 use std::process::{Command, Output};
 
-fn run(a: &str, b: &str) -> Output {
+fn vcf_parity(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_vcf-parity"))
-        .args([format!("tests/data/{a}"), format!("tests/data/{b}")])
+        .args(args)
         .output()
         .unwrap()
+}
+
+fn run(a: &str, b: &str) -> Output {
+    vcf_parity(&[&format!("tests/data/{a}"), &format!("tests/data/{b}")])
 }
 
 #[test]
@@ -66,10 +70,7 @@ fn missing_sample_column_is_an_error() {
 #[test]
 fn version_and_help_exit_zero() {
     for flag in ["--version", "-V", "--help", "-h"] {
-        let out = Command::new(env!("CARGO_BIN_EXE_vcf-parity"))
-            .arg(flag)
-            .output()
-            .unwrap();
+        let out = vcf_parity(&[flag]);
         assert_eq!(out.status.code(), Some(0), "{flag}");
         let stdout = String::from_utf8(out.stdout).unwrap();
         assert!(
@@ -77,4 +78,9 @@ fn version_and_help_exit_zero() {
             "{flag}"
         );
     }
+}
+
+#[test]
+fn wrong_arguments_exit_two() {
+    assert_eq!(vcf_parity(&["only-one.vcf"]).status.code(), Some(2));
 }
