@@ -7,7 +7,20 @@ use std::process::ExitCode;
 use input::{Inputs, Record, Scope, open_pair};
 use pair::{Pair, pair_by};
 
-const USAGE: &str = "usage: vcf-parity <a.vcf[.gz]> <b.vcf[.gz]>";
+#[derive(clap::Parser)]
+#[command(
+    version,
+    about,
+    help_template = "{name} {version}\n{about}\n\n{usage-heading} {usage}\n\n{all-args}{after-help}",
+    after_help = "Writes one TSV row per discrepancy to stdout and a summary to stderr.\nExit code: 0 files match, 1 files differ, 2 error."
+)]
+struct Cli {
+    /// First VCF or bgzipped VCF
+    a: String,
+    /// Second VCF or bgzipped VCF
+    b: String,
+}
+
 const COLUMNS: &str = "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b";
 const MISSING: &str = ".";
 
@@ -172,12 +185,8 @@ fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let [a, b] = args.as_slice() else {
-        eprintln!("{USAGE}");
-        return ExitCode::from(2);
-    };
-    match run(a, b) {
+    let cli = <Cli as clap::Parser>::parse();
+    match run(&cli.a, &cli.b) {
         Ok(false) => ExitCode::SUCCESS,
         Ok(true) => ExitCode::from(1),
         Err(e) => {
