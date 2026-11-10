@@ -7,3 +7,4 @@ description = "Field-level comparison of two VCF files"
 repository = "https://github.com/maxulysse/vcf-parity"
 
 [dependencies]
+noodles = { version = "0.119.0", features = ["vcf", "bgzf"] }
