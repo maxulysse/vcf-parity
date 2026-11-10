@@ -1,0 +1,14 @@
+##fileformat=VCFv4.1
+##contig=<ID=chr20,length=64444167>
+##contig=<ID=chr21,length=46709983>
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Length difference between REF and ALT">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variant">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S1	S2
+chr20	1000	sv1	A	<DEL>	52	PASS	SVTYPE=DEL;END=1100;SVLEN=-100	GT:GQ	0/1:40	0/0:30
+chr20	2000	sv2	G	<INS>	31	PASS	SVTYPE=INS;SVLEN=120	GT:GQ	0/1:20	0/0:30
+chr20	4000	sv5	A	<DEL>	40	PASS	SVTYPE=DEL;END=4200;SVLEN=-200	GT:GQ	0/1:30	0/0:30
+chr21	500	sv4	T	<DUP>	60	PASS	SVTYPE=DUP;END=900;SVLEN=400	GT:GQ	0/1:50	0/0:30
