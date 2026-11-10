@@ -17,10 +17,10 @@ Samples present in only one file are reported, not compared.
 
 ## Exit codes
 
-| Code | Meaning |
-|---|---|
-| `0` | files match |
-| `1` | files differ |
-| `2` | error |
+| Code | Meaning      |
+| ---- | ------------ |
+| `0`  | files match  |
+| `1`  | files differ |
+| `2`  | error        |
 
 A summary goes to stderr.

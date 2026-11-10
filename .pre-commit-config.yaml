@@ -1,0 +1,13 @@
+exclude: ^tests/data/.*\.vcf(\.gz)?$
+repos:
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.9.10
+    hooks:
+      - id: prettier
+        types_or: [markdown, yaml]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
