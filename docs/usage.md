@@ -89,3 +89,13 @@ An argument file keeps the `--ignore` and `--tolerance` options of one kind of c
 A summary goes to stderr: records compared, records and samples in one file only, field differences, differences within tolerance, and header differences.
 
 If a reader such as `head` closes stdout early, vcf-parity stops without a message or summary and exits with `1` if it found a difference, `0` otherwise.
+
+## Performance
+
+Comparing the GIAB HG002 v4.2.1 benchmark (GRCh38, chromosomes 1 to 22, 4,048,342 records, one sample) with itself takes about 20 s and 3.4 MB of memory with vcf-parity 0.2.1 on a 16-core Linux workstation.
+Input is streamed on one thread, so memory does not grow with file size.
+
+```console
+curl -O https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+vcf-parity HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz > /dev/null
+```
