@@ -2,13 +2,12 @@ mod input;
 mod pair;
 mod tolerance;
 
-use std::collections::HashMap;
 use std::io::{self, BufWriter, StdoutLock, Write};
 use std::process::ExitCode;
 
 use input::{Inputs, Record, Scope, open_pair};
 use pair::{Pair, pair_by};
-use tolerance::Tolerance;
+use tolerance::{Tolerance, Tolerances};
 
 #[derive(clap::Parser)]
 #[command(
@@ -49,7 +48,7 @@ impl Counts {
 struct Report {
     out: BufWriter<StdoutLock<'static>>,
     shared_samples: Vec<String>,
-    tolerances: HashMap<String, Tolerance>,
+    tolerances: Tolerances,
     counts: Counts,
 }
 
@@ -121,9 +120,7 @@ impl Report {
                 if x.value == y.value {
                     continue;
                 }
-                if let Some(t) = self.tolerances.get(&x.name)
-                    && t.accepts(&x.value, &y.value)
-                {
+                if self.tolerances.accepts(&x.name, &x.value, &y.value) {
                     self.counts.tolerated += 1;
                     continue;
                 }
@@ -145,24 +142,6 @@ impl Report {
     }
 }
 
-/// Indexes the tolerances by field, checking each against the header types of both files.
-fn tolerances(
-    given: &[(String, Tolerance)],
-    declared: &HashMap<String, Vec<String>>,
-) -> io::Result<HashMap<String, Tolerance>> {
-    let invalid = |message: String| io::Error::new(io::ErrorKind::InvalidInput, message);
-    let mut tolerances = HashMap::new();
-    for (field, tolerance) in given {
-        if !tolerance::check_field(field, declared).map_err(invalid)? {
-            eprintln!("vcf-parity: warning: {field} is not declared in either header");
-        }
-        if tolerances.insert(field.clone(), *tolerance).is_some() {
-            return Err(invalid(format!("{field}: tolerance given twice")));
-        }
-    }
-    Ok(tolerances)
-}
-
 fn run(cli: &Cli) -> io::Result<bool> {
     let Inputs {
         mut a,
@@ -173,7 +152,8 @@ fn run(cli: &Cli) -> io::Result<bool> {
         shared_samples,
         declared_types,
     } = open_pair(&cli.a, &cli.b)?;
-    let tolerances = tolerances(&cli.tolerances, &declared_types)?;
+    let tolerances = Tolerances::new(&cli.tolerances, &declared_types)
+        .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
 
     let mut report = Report {
         out: BufWriter::new(io::stdout().lock()),

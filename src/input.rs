@@ -84,7 +84,7 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
 
     let mut declared_types = HashMap::new();
     for header in [&header_a, &header_b] {
-        declared(header, &mut declared_types);
+        declare_types(header, &mut declared_types);
     }
 
     let names = |h: &vcf::Header| -> Vec<String> { h.sample_names().iter().cloned().collect() };
@@ -116,18 +116,18 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
     })
 }
 
-fn declared(header: &vcf::Header, types: &mut HashMap<String, Vec<String>>) {
+fn declare_types(header: &vcf::Header, types: &mut HashMap<String, Vec<String>>) {
     for (key, info) in header.infos() {
         types
             .entry(format!("INFO/{key}"))
             .or_default()
-            .push(format!("{:?}", info.ty()));
+            .push(info.ty().as_ref().to_string());
     }
     for (key, format) in header.formats() {
         types
             .entry(format!("FORMAT/{key}"))
             .or_default()
-            .push(format!("{:?}", format.ty()));
+            .push(format.ty().as_ref().to_string());
     }
 }
 
@@ -246,4 +246,30 @@ fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Resu
         alternate: r.alternate_bases().as_ref().to_string(),
         fields,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header(lines: &str) -> vcf::Header {
+        format!("##fileformat=VCFv4.3\n{lines}#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+            .parse()
+            .unwrap()
+    }
+
+    #[test]
+    fn keeps_header_types_from_both_files() {
+        let a = header(
+            "##INFO=<ID=AF,Number=A,Type=Float,Description=\"x\">\n\
+             ##FORMAT=<ID=XD,Number=1,Type=Integer,Description=\"x\">\n",
+        );
+        let b = header("##FORMAT=<ID=XD,Number=1,Type=String,Description=\"x\">\n");
+        let mut types = HashMap::new();
+        for h in [&a, &b] {
+            declare_types(h, &mut types);
+        }
+        assert_eq!(types["INFO/AF"], ["Float"]);
+        assert_eq!(types["FORMAT/XD"], ["Integer", "String"]);
+    }
 }
