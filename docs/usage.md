@@ -47,4 +47,4 @@ Differences within tolerance are not written to the TSV and do not change the ex
 | `1`  | files differ |
 | `2`  | error        |
 
-A summary goes to stderr.
+A summary goes to stderr: records compared, records and samples in one file only, field differences, and differences within tolerance.
