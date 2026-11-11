@@ -87,3 +87,5 @@ An argument file keeps the `--ignore` and `--tolerance` options of one kind of c
 | `2`  | error        |
 
 A summary goes to stderr: records compared, records and samples in one file only, field differences, differences within tolerance, and header differences.
+
+If a reader such as `head` closes stdout early, vcf-parity stops without a message or summary and exits with `1` if it found a difference, `0` otherwise.
