@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ID compared as a set, like FILTER
+- [#8](https://github.com/maxulysse/vcf-parity/pull/8) - ID compared as a set, like FILTER
 - [#7](https://github.com/maxulysse/vcf-parity/pull/7) - FILTER compared as a set: order and repeats ignored, filters written in sorted order
 
 ## [0.1.0](https://github.com/maxulysse/vcf-parity/releases/tag/0.1.0) - Dohko
