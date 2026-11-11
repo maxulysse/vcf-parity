@@ -181,3 +181,87 @@ fn undeclared_tolerance_field_warns() {
             .contains("INFO/NOPE is not declared in either header")
     );
 }
+
+#[test]
+fn reports_header_differences() {
+    let out = run("a.vcf", "header.vcf");
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b\n\
+         .\t.\t.\t.\t.\theader/INFO/SVLEN/Description\tdiffers\tLength difference between REF and ALT\tDifference in length between REF and ALT alleles\n\
+         .\t.\t.\t.\t.\theader/contig/chr21/length\tdiffers\t46709983\t46709984\n\
+         .\t.\t.\t.\t.\theader/FILTER/LowQual\tmissing_in_a\t.\t<ID=LowQual,Description=\"Low quality\">\n\
+         .\t.\t.\t.\t.\theader/fileDate\tmissing_in_a\t.\t20261111\n\
+         .\t.\t.\t.\t.\theader/contig\tdiffers\tchr20,chr21\tchr21,chr20\n"
+    );
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("5 header differences")
+    );
+}
+
+#[test]
+fn unsorted_error_mentions_contig_order() {
+    let out = run("header.vcf", "a.vcf");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("list contigs in different orders")
+    );
+}
+
+#[test]
+fn ignore_patterns_skip_fields() {
+    let out = vcf_parity(&[
+        "--ignore=header/fileDate",
+        "--ignore=header/*/*/Description",
+        "--ignore=header/contig",
+        "tests/data/a.vcf",
+        "tests/data/header.vcf",
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b\n\
+         .\t.\t.\t.\t.\theader/FILTER/LowQual\tmissing_in_a\t.\t<ID=LowQual,Description=\"Low quality\">\n"
+    );
+
+    let mut args = vec!["tests/data/a.vcf", "tests/data/b.vcf"];
+    for pattern in ["sample", "QUAL", "INFO/IMPRECISE", "FORMAT", "record"] {
+        args.extend(["--ignore", pattern]);
+    }
+    assert_eq!(vcf_parity(&args).status.code(), Some(0));
+}
+
+#[test]
+fn reads_arguments_from_a_file() {
+    let path = format!("{}/ignore.args", env!("CARGO_TARGET_TMPDIR"));
+    std::fs::write(
+        &path,
+        "# header lines\n--ignore=header\n\n--ignore\nsample\n",
+    )
+    .unwrap();
+    let file = format!("@{path}");
+    let out = vcf_parity(&[&file, "tests/data/a.vcf", "tests/data/header.vcf"]);
+    assert_eq!(out.status.code(), Some(0));
+    let out = vcf_parity(&[&file, "tests/data/a.vcf", "tests/data/b.vcf"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        vcf_parity(&["@missing.args", "a", "b"]).status.code(),
+        Some(2)
+    );
+}
+
+#[test]
+fn unsorted_error_mentions_a_contig_only_in_the_second_file() {
+    let out = run("a.vcf", "extra_contig.vcf");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("list contigs in different orders")
+    );
+}

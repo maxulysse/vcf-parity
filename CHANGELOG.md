@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [#6](https://github.com/maxulysse/vcf-parity/pull/6) - Header comparison: `##KEY=<ID=...>` lines attribute by attribute, other `##` lines as text, order of shared contigs
+- [#6](https://github.com/maxulysse/vcf-parity/pull/6) - `--ignore PATTERN` to skip record or header fields, with `*` matching one path segment
+- [#6](https://github.com/maxulysse/vcf-parity/pull/6) - `@FILE` argument files, one argument per line
 - [#4](https://github.com/maxulysse/vcf-parity/pull/4) - `--tolerance FIELD=SPEC` for numeric fields: `exact`, `abs:X`, `rel:X` or `abs:X,rel:Y`, element by element for lists; checked against the header types; matches within tolerance counted in the summary
 
 ## [0.1.0](https://github.com/maxulysse/vcf-parity/releases/tag/0.1.0) - Dohko

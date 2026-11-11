@@ -4,6 +4,7 @@ use std::io::{self, BufRead};
 use noodles::vcf;
 
 use crate::MISSING;
+use crate::header;
 
 /// Whether a field belongs to the site or to a shared sample (index into the shared sample names).
 #[derive(Clone, Copy, PartialEq)]
@@ -38,15 +39,32 @@ impl Record {
 }
 
 /// Contig order for merging and sort checks: `##contig` lines of a, then of b, then first appearance in the records.
-pub struct ContigOrder(HashMap<String, usize>);
+pub struct ContigOrder {
+    indices: HashMap<String, usize>,
+    /// The `##contig` lines of b are out of this order, so b's records can look unsorted.
+    headers_disagree: bool,
+}
 
 impl ContigOrder {
+    fn new(a: &vcf::Header, b: &vcf::Header) -> Self {
+        let mut indices = HashMap::new();
+        for name in a.contigs().keys().chain(b.contigs().keys()) {
+            let i = indices.len();
+            indices.entry(name.clone()).or_insert(i);
+        }
+        let headers_disagree = !b.contigs().keys().map(|name| indices[name]).is_sorted();
+        ContigOrder {
+            indices,
+            headers_disagree,
+        }
+    }
+
     fn index(&mut self, name: &str) -> usize {
-        if let Some(&i) = self.0.get(name) {
+        if let Some(&i) = self.indices.get(name) {
             return i;
         }
-        let i = self.0.len();
-        self.0.insert(name.to_string(), i);
+        let i = self.indices.len();
+        self.indices.insert(name.to_string(), i);
         i
     }
 }
@@ -71,16 +89,15 @@ pub struct Inputs {
     pub shared_samples: Vec<String>,
     /// Header types of each INFO and FORMAT key, from both files, keyed as `INFO/<key>` or `FORMAT/<key>`.
     pub declared_types: HashMap<String, Vec<String>>,
+    pub header_differences: Vec<header::Difference>,
 }
 
 pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
     let (reader_a, header_a) = open(path_a)?;
     let (reader_b, header_b) = open(path_b)?;
 
-    let mut order = ContigOrder(HashMap::new());
-    for name in header_a.contigs().keys().chain(header_b.contigs().keys()) {
-        order.index(name);
-    }
+    let header_differences = header::differences(&header_a, &header_b)?;
+    let order = ContigOrder::new(&header_a, &header_b);
 
     let mut declared_types = HashMap::new();
     for header in [&header_a, &header_b] {
@@ -113,6 +130,7 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
         names_b,
         shared_samples,
         declared_types,
+        header_differences,
     })
 }
 
@@ -158,10 +176,15 @@ impl Input {
         let record =
             flatten(&self.buf, contig, &self.sample_columns).map_err(|e| with_path(path, e))?;
         if record.key() < self.last_key {
-            let message = format!(
+            let mut message = format!(
                 "records are not sorted at {}:{} (contig order follows the ##contig lines of the first file)",
                 record.chrom, record.pos
             );
+            if order.headers_disagree {
+                message.push_str(
+                    "; the ##contig lines of the two files list contigs in different orders",
+                );
+            }
             return Err(with_path(
                 path,
                 io::Error::new(io::ErrorKind::InvalidData, message),

@@ -13,6 +13,14 @@ impl<T> Pair<T> {
         }
     }
 
+    pub fn as_ref(&self) -> Pair<&T> {
+        match self {
+            Pair::Both(a, b) => Pair::Both(a, b),
+            Pair::OnlyA(a) => Pair::OnlyA(a),
+            Pair::OnlyB(b) => Pair::OnlyB(b),
+        }
+    }
+
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Pair<U> {
         match self {
             Pair::Both(a, b) => Pair::Both(f(a), f(b)),
