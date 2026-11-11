@@ -122,8 +122,14 @@ fn tolerances_hide_close_values() {
 
 #[test]
 fn values_within_tolerance_exit_zero() {
-    let out = run_with("a.vcf", "a.vcf", &["QUAL=abs:1"]);
+    let out = run_with("numeric_a.vcf", "numeric_c.vcf", &[]);
+    assert_eq!(out.status.code(), Some(1));
+    let out = run_with("numeric_a.vcf", "numeric_c.vcf", &["QUAL=abs:1"]);
     assert_eq!(out.status.code(), Some(0));
+}
+
+#[test]
+fn missing_values_and_length_mismatches_still_differ() {
     let out = run_with(
         "numeric_a.vcf",
         "numeric_b.vcf",
@@ -134,7 +140,6 @@ fn values_within_tolerance_exit_zero() {
             "FORMAT/AD=abs:1",
         ],
     );
-    // A missing value and a list of another length still differ.
     assert_eq!(out.status.code(), Some(1));
 }
 
