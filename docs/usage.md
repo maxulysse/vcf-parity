@@ -19,7 +19,7 @@ Unsorted input is an error, including a second file sorted in another contig ord
 
 Records are matched on CHROM, POS, REF and ALT.
 Matched records are compared on ID, QUAL, FILTER, every INFO key, and every FORMAT key of the samples present in both files.
-Values are compared as text unless a [tolerance](#tolerances) applies, except FILTER, which is compared as a set: order and repeats do not count, and filters are written in sorted order.
+Values are compared as text unless a [tolerance](#tolerances) applies, except ID and FILTER, which are compared as sets: order and repeats do not count, and items are written in sorted order.
 Samples present in one file only are reported, not compared.
 
 ## Headers

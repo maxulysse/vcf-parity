@@ -3,5 +3,5 @@
 ##FILTER=<ID=q10,Description="Quality below 10">
 ##FILTER=<ID=LowGQ,Description="Low genotype quality">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
-chr1	100	.	A	C	50	q10;LowGQ	.
-chr1	200	.	G	T	50	q10	.
+chr1	100	rs2;rs1	A	C	50	LowGQ;q10	.
+chr1	200	rs4;rs3	G	T	50	q10;LowGQ;q10	.
