@@ -185,32 +185,48 @@ impl Report {
 }
 
 fn run(cli: &Cli) -> io::Result<bool> {
-    let Inputs {
-        mut a,
-        mut b,
-        mut order,
-        names_a,
-        names_b,
-        shared_samples,
-        declared_types,
-        header_differences,
-    } = open_pair(&cli.a, &cli.b)?;
-    let tolerances = Tolerances::new(&cli.tolerances, &declared_types)
+    let mut inputs = open_pair(&cli.a, &cli.b)?;
+    let tolerances = Tolerances::new(&cli.tolerances, &inputs.declared_types)
         .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
 
     let mut report = Report {
         out: BufWriter::new(io::stdout().lock()),
-        shared_samples,
+        shared_samples: inputs.shared_samples.clone(),
         tolerances,
         ignore: Patterns::new(&cli.ignore),
         counts: Counts::default(),
     };
-    writeln!(report.out, "{COLUMNS}")?;
-    report.header(&header_differences)?;
-    report.samples(&names_a, &names_b)?;
+    match compare(&mut report, &mut inputs) {
+        // A reader such as `head` closed stdout: the differences counted so far decide the exit code.
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => return Ok(report.counts.any()),
+        result => result?,
+    }
 
-    let mut block_a = a.block(&mut order)?;
-    let mut block_b = b.block(&mut order)?;
+    let c = &report.counts;
+    eprintln!(
+        "vcf-parity: {} records compared, {} only in a, {} only in b, {} field differences, {} field differences within tolerance, {} samples in one file only, {} header differences",
+        c.compared, c.only_a, c.only_b, c.fields, c.tolerated, c.samples, c.header
+    );
+    Ok(c.any())
+}
+
+/// Writes every discrepancy row: header, samples, then the records of both files merged by position.
+fn compare(report: &mut Report, inputs: &mut Inputs) -> io::Result<()> {
+    let Inputs {
+        a,
+        b,
+        order,
+        names_a,
+        names_b,
+        header_differences,
+        ..
+    } = inputs;
+    writeln!(report.out, "{COLUMNS}")?;
+    report.header(header_differences)?;
+    report.samples(names_a, names_b)?;
+
+    let mut block_a = a.block(order)?;
+    let mut block_b = b.block(order)?;
     while let Some(key) = block_a
         .first()
         .into_iter()
@@ -228,20 +244,13 @@ fn run(cli: &Cli) -> io::Result<bool> {
         let (at_a, at_b) = (take(&mut block_a), take(&mut block_b));
         report.records(&at_a, &at_b)?;
         if block_a.is_empty() {
-            block_a = a.block(&mut order)?;
+            block_a = a.block(order)?;
         }
         if block_b.is_empty() {
-            block_b = b.block(&mut order)?;
+            block_b = b.block(order)?;
         }
     }
-    report.out.flush()?;
-
-    let c = &report.counts;
-    eprintln!(
-        "vcf-parity: {} records compared, {} only in a, {} only in b, {} field differences, {} field differences within tolerance, {} samples in one file only, {} header differences",
-        c.compared, c.only_a, c.only_b, c.fields, c.tolerated, c.samples, c.header
-    );
-    Ok(c.any())
+    report.out.flush()
 }
 
 /// Replaces each `@FILE` argument with the lines of FILE, skipping blank lines and `#` comments.

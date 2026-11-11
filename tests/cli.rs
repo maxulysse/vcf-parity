@@ -304,3 +304,35 @@ fn unsorted_error_mentions_contigs_without_contig_lines() {
             .contains("contigs without a ##contig line are ordered as first read")
     );
 }
+
+#[test]
+fn closed_stdout_stops_quietly() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_vcf-parity"))
+        .args([
+            "tests/data/nf-core/NA12878_GIAB.chr22.vcf.gz",
+            "tests/data/nf-core/test.rnaseq.vcf.gz",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        !String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("Broken pipe")
+    );
+}
+
+#[test]
+fn closed_stdout_keeps_the_exit_code_of_matching_files() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_vcf-parity"))
+        .args(["tests/data/a.vcf", "tests/data/a.vcf"])
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    assert_eq!(child.wait().unwrap().code(), Some(0));
+}
