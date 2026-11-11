@@ -267,12 +267,13 @@ fn unsorted_error_mentions_a_contig_only_in_the_second_file() {
 }
 
 #[test]
-fn filters_are_compared_as_sets() {
-    let out = run("filters_a.vcf", "filters_b.vcf");
+fn ids_and_filters_are_compared_as_sets() {
+    let out = run("lists_a.vcf", "lists_b.vcf");
     assert_eq!(out.status.code(), Some(1));
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
         "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b\n\
+         chr1\t200\tG\tT\t.\tID\tdiffers\trs3\trs3;rs4\n\
          chr1\t200\tG\tT\t.\tFILTER\tdiffers\tq10\tLowGQ;q10\n"
     );
 }

@@ -216,6 +216,14 @@ impl Input {
     }
 }
 
+/// Sorts and deduplicates a `;`-separated list, so order and repeats are not differences.
+fn as_set(list: &str) -> String {
+    let mut items: Vec<&str> = list.split(';').collect();
+    items.sort_unstable();
+    items.dedup();
+    items.join(";")
+}
+
 fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Result<Record> {
     let chrom = r.reference_sequence_name();
     let pos = r.variant_start().transpose()?.map_or(0, usize::from);
@@ -225,15 +233,10 @@ fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Resu
         value: if value.is_empty() { MISSING } else { value }.to_string(),
     };
     let qual = r.quality_score().transpose()?.map(|q| q.to_string());
-    // FILTER is a set: sorted and deduplicated, so order and repeats are not differences.
-    let raw = r.filters();
-    let mut filters: Vec<&str> = raw.as_ref().split(';').collect();
-    filters.sort_unstable();
-    filters.dedup();
     let mut fields = vec![
-        site("ID", r.ids().as_ref()),
+        site("ID", &as_set(r.ids().as_ref())),
         site("QUAL", qual.as_deref().unwrap_or(MISSING)),
-        site("FILTER", &filters.join(";")),
+        site("FILTER", &as_set(r.filters().as_ref())),
     ];
 
     let info = r.info();
