@@ -1,11 +1,13 @@
 mod input;
 mod pair;
+mod tolerance;
 
 use std::io::{self, BufWriter, StdoutLock, Write};
 use std::process::ExitCode;
 
 use input::{Inputs, Record, Scope, open_pair};
 use pair::{Pair, pair_by};
+use tolerance::{Tolerance, Tolerances};
 
 #[derive(clap::Parser)]
 #[command(
@@ -19,6 +21,9 @@ struct Cli {
     a: String,
     /// Second VCF or bgzipped VCF
     b: String,
+    /// Tolerance for a numeric field, repeatable: FIELD=exact, FIELD=abs:X, FIELD=rel:X or FIELD=abs:X,rel:Y
+    #[arg(long = "tolerance", value_name = "FIELD=SPEC", value_parser = tolerance::parse)]
+    tolerances: Vec<(String, Tolerance)>,
 }
 
 const COLUMNS: &str = "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b";
@@ -31,6 +36,7 @@ struct Counts {
     only_b: usize,
     samples: usize,
     fields: usize,
+    tolerated: usize,
 }
 
 impl Counts {
@@ -42,6 +48,7 @@ impl Counts {
 struct Report {
     out: BufWriter<StdoutLock<'static>>,
     shared_samples: Vec<String>,
+    tolerances: Tolerances,
     counts: Counts,
 }
 
@@ -109,10 +116,14 @@ impl Report {
         for pair in pair_by(&a.fields, &b.fields, |x, y| {
             x.scope == y.scope && x.name == y.name
         }) {
-            if let Pair::Both(x, y) = &pair
-                && x.value == y.value
-            {
-                continue;
+            if let Pair::Both(x, y) = &pair {
+                if x.value == y.value {
+                    continue;
+                }
+                if self.tolerances.accepts(&x.name, &x.value, &y.value) {
+                    self.counts.tolerated += 1;
+                    continue;
+                }
             }
             self.counts.fields += 1;
             let field = pair.either();
@@ -131,7 +142,7 @@ impl Report {
     }
 }
 
-fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
+fn run(cli: &Cli) -> io::Result<bool> {
     let Inputs {
         mut a,
         mut b,
@@ -139,11 +150,15 @@ fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
         names_a,
         names_b,
         shared_samples,
-    } = open_pair(path_a, path_b)?;
+        declared_types,
+    } = open_pair(&cli.a, &cli.b)?;
+    let tolerances = Tolerances::new(&cli.tolerances, &declared_types)
+        .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
 
     let mut report = Report {
         out: BufWriter::new(io::stdout().lock()),
         shared_samples,
+        tolerances,
         counts: Counts::default(),
     };
     writeln!(report.out, "{COLUMNS}")?;
@@ -178,15 +193,15 @@ fn run(path_a: &str, path_b: &str) -> io::Result<bool> {
 
     let c = &report.counts;
     eprintln!(
-        "vcf-parity: {} records compared, {} only in a, {} only in b, {} field differences, {} samples in one file only",
-        c.compared, c.only_a, c.only_b, c.fields, c.samples
+        "vcf-parity: {} records compared, {} only in a, {} only in b, {} field differences, {} field differences within tolerance, {} samples in one file only",
+        c.compared, c.only_a, c.only_b, c.fields, c.tolerated, c.samples
     );
     Ok(c.any())
 }
 
 fn main() -> ExitCode {
     let cli = <Cli as clap::Parser>::parse();
-    match run(&cli.a, &cli.b) {
+    match run(&cli) {
         Ok(false) => ExitCode::SUCCESS,
         Ok(true) => ExitCode::from(1),
         Err(e) => {

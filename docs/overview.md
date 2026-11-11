@@ -10,7 +10,3 @@ Typical pairs:
 - calls from BAM and from CRAM input of the same reads;
 - calls from two platforms, for example x86_64 and ARM;
 - calls from two releases of a caller.
-
-## Planned
-
-- Per-field tolerances: exact, absolute or relative.
