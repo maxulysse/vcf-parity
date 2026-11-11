@@ -41,6 +41,8 @@ impl Record {
 /// Contig order for merging and sort checks: `##contig` lines of a, then of b, then first appearance in the records.
 pub struct ContigOrder {
     indices: HashMap<String, usize>,
+    /// Contigs below this index come from `##contig` lines; the others are numbered as first read.
+    declared: usize,
     /// The `##contig` lines of b are out of this order, so b's records can look unsorted.
     headers_disagree: bool,
 }
@@ -54,9 +56,24 @@ impl ContigOrder {
         }
         let headers_disagree = !b.contigs().keys().map(|name| indices[name]).is_sorted();
         ContigOrder {
+            declared: indices.len(),
             indices,
             headers_disagree,
         }
+    }
+
+    /// Extra text for an unsorted-records error between contigs `previous` and `current`.
+    fn explain(&self, previous: usize, current: usize) -> String {
+        let mut text = String::new();
+        if self.headers_disagree {
+            text.push_str("; the ##contig lines of the two files list contigs in different orders");
+        }
+        if previous.max(current) >= self.declared {
+            text.push_str(
+                "; contigs without a ##contig line are ordered as first read, add ##contig lines",
+            );
+        }
+        text
     }
 
     fn index(&mut self, name: &str) -> usize {
@@ -71,8 +88,9 @@ impl ContigOrder {
 
 pub struct Input {
     path: String,
-    reader: vcf::io::Reader<Box<dyn BufRead>>,
-    buf: vcf::Record,
+    reader: Box<dyn BufRead>,
+    /// The current record line.
+    line: String,
     /// Column of each shared sample in this file.
     sample_columns: Vec<usize>,
     next: Option<Record>,
@@ -114,7 +132,7 @@ pub fn open_pair(path_a: &str, path_b: &str) -> io::Result<Inputs> {
     let input = |path: &str, reader, names: &[String]| Input {
         path: path.to_string(),
         reader,
-        buf: vcf::Record::default(),
+        line: String::new(),
         sample_columns: shared_samples
             .iter()
             .map(|s| names.iter().position(|n| n == s).unwrap())
@@ -149,12 +167,13 @@ fn declare_types(header: &vcf::Header, types: &mut HashMap<String, Vec<String>>)
     }
 }
 
-fn open(path: &str) -> io::Result<(vcf::io::Reader<Box<dyn BufRead>>, vcf::Header)> {
+/// Reads the header with noodles; records are split by `Input::read`, so values keep their exact text.
+fn open(path: &str) -> io::Result<(Box<dyn BufRead>, vcf::Header)> {
     let mut reader = vcf::io::reader::Builder::default()
         .build_from_path(path)
         .map_err(|e| with_path(path, e))?;
     let header = reader.read_header().map_err(|e| with_path(path, e))?;
-    Ok((reader, header))
+    Ok((reader.into_inner(), header))
 }
 
 fn with_path(path: &str, e: io::Error) -> io::Error {
@@ -164,27 +183,29 @@ fn with_path(path: &str, e: io::Error) -> io::Error {
 impl Input {
     fn read(&mut self, order: &mut ContigOrder) -> io::Result<Option<Record>> {
         let path = &self.path;
+        self.line.clear();
         if self
             .reader
-            .read_record(&mut self.buf)
+            .read_line(&mut self.line)
             .map_err(|e| with_path(path, e))?
             == 0
         {
             return Ok(None);
         }
-        let contig = order.index(self.buf.reference_sequence_name());
+        let columns: Vec<&str> = self
+            .line
+            .trim_end_matches(['\n', '\r'])
+            .split('\t')
+            .collect();
         let record =
-            flatten(&self.buf, contig, &self.sample_columns).map_err(|e| with_path(path, e))?;
+            flatten(&columns, order, &self.sample_columns).map_err(|e| with_path(path, e))?;
         if record.key() < self.last_key {
-            let mut message = format!(
-                "records are not sorted at {}:{} (contig order follows the ##contig lines of the first file)",
-                record.chrom, record.pos
+            let message = format!(
+                "records are not sorted at {}:{} (contig order follows the ##contig lines of the first file){}",
+                record.chrom,
+                record.pos,
+                order.explain(self.last_key.0, record.contig)
             );
-            if order.headers_disagree {
-                message.push_str(
-                    "; the ##contig lines of the two files list contigs in different orders",
-                );
-            }
             return Err(with_path(
                 path,
                 io::Error::new(io::ErrorKind::InvalidData, message),
@@ -224,42 +245,59 @@ fn as_set(list: &str) -> String {
     items.join(";")
 }
 
-fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Result<Record> {
-    let chrom = r.reference_sequence_name();
-    let pos = r.variant_start().transpose()?.map_or(0, usize::from);
+/// Splits one record line, already cut into its tab-separated columns, into comparable fields.
+fn flatten(
+    columns: &[&str],
+    order: &mut ContigOrder,
+    sample_columns: &[usize],
+) -> io::Result<Record> {
+    let invalid = |message: String| io::Error::new(io::ErrorKind::InvalidData, message);
+    let &[
+        chrom,
+        pos,
+        ids,
+        reference,
+        alternate,
+        qual,
+        filters,
+        info,
+        ref samples @ ..,
+    ] = columns
+    else {
+        return Err(invalid(format!(
+            "expected at least 8 columns, got {}",
+            columns.len()
+        )));
+    };
+    let pos: usize = pos
+        .parse()
+        .map_err(|_| invalid(format!("{chrom}: invalid POS '{pos}'")))?;
     let site = |name: &str, value: &str| Field {
         scope: Scope::Site,
         name: name.to_string(),
         value: if value.is_empty() { MISSING } else { value }.to_string(),
     };
-    let qual = r.quality_score().transpose()?.map(|q| q.to_string());
     let mut fields = vec![
-        site("ID", &as_set(r.ids().as_ref())),
-        site("QUAL", qual.as_deref().unwrap_or(MISSING)),
-        site("FILTER", &as_set(r.filters().as_ref())),
+        site("ID", &as_set(ids)),
+        site("QUAL", qual),
+        site("FILTER", &as_set(filters)),
     ];
 
-    let info = r.info();
-    for entry in info
-        .as_ref()
-        .split(';')
-        .filter(|e| !e.is_empty() && *e != MISSING)
-    {
+    for entry in info.split(';').filter(|e| !e.is_empty() && *e != MISSING) {
         let (key, value) = entry.split_once('=').unwrap_or((entry, "true"));
         fields.push(site(&format!("INFO/{key}"), value));
     }
 
-    let samples = r.samples();
-    let keys: Vec<&str> = samples.keys().iter().collect();
-    let values: Vec<_> = samples.iter().collect();
+    let keys: Vec<&str> = samples
+        .first()
+        .map_or(Vec::new(), |k| k.split(':').collect());
     for (shared, &column) in sample_columns.iter().enumerate() {
-        let sample = values.get(column).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("{chrom}:{pos}: fewer sample columns than in the header"),
-            )
+        let sample = samples.get(1 + column).ok_or_else(|| {
+            invalid(format!(
+                "{chrom}:{pos}: fewer sample columns than in the header"
+            ))
         })?;
-        let sample_values: Vec<&str> = sample.as_ref().split(':').collect();
+        let sample_values: Vec<&str> = sample.split(':').collect();
         for (i, key) in keys.iter().enumerate() {
             fields.push(Field {
                 scope: Scope::Sample(shared),
@@ -270,11 +308,11 @@ fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Resu
     }
 
     Ok(Record {
-        contig,
+        contig: order.index(chrom),
         chrom: chrom.to_string(),
         pos,
-        reference: r.reference_bases().to_string(),
-        alternate: r.alternate_bases().as_ref().to_string(),
+        reference: reference.to_string(),
+        alternate: alternate.to_string(),
         fields,
     })
 }
@@ -287,6 +325,19 @@ mod tests {
         format!("##fileformat=VCFv4.3\n{lines}#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
             .parse()
             .unwrap()
+    }
+
+    #[test]
+    fn rejects_lines_with_fewer_than_8_columns() {
+        let mut order = ContigOrder::new(&header(""), &header(""));
+        let error = flatten(&["chr1", "1", ".", "A", "C", "5", "PASS"], &mut order, &[])
+            .err()
+            .unwrap();
+        assert!(
+            error
+                .to_string()
+                .contains("expected at least 8 columns, got 7")
+        );
     }
 
     #[test]
