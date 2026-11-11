@@ -22,7 +22,7 @@ cargo install --git https://github.com/maxulysse/vcf-parity
 vcf-parity a.vcf.gz b.vcf.gz > discrepancies.tsv
 ```
 
-Records are matched on CHROM, POS, REF and ALT; numeric fields accept tolerances.
+Headers are compared line by line, records are matched on CHROM, POS, REF and ALT, numeric fields accept tolerances, and any field can be ignored.
 Each discrepancy is one TSV row, and the exit code is `1` when the files differ.
 See [usage](docs/usage.md) and [output](docs/output.md).
 
