@@ -1,0 +1,7 @@
+##fileformat=VCFv4.1
+##contig=<ID=chr1,length=1000>
+##FILTER=<ID=q10,Description="Quality below 10">
+##FILTER=<ID=LowGQ,Description="Low genotype quality">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	100	.	A	C	50	LowGQ;q10	.
+chr1	200	.	G	T	50	q10;LowGQ;q10	.

@@ -29,7 +29,7 @@ struct Cli {
     /// Tolerance for a numeric field, repeatable: FIELD=exact, FIELD=abs:X, FIELD=rel:X or FIELD=abs:X,rel:Y
     #[arg(long = "tolerance", value_name = "FIELD=SPEC", value_parser = tolerance::parse)]
     tolerances: Vec<(String, Tolerance)>,
-    /// Skip fields matching PATTERN, repeatable: `/`-separated segments, `*` matches one segment, a prefix covers everything below it
+    /// Skip fields matching PATTERN, repeatable: /-separated segments, * matches one segment, a pattern also matches every field below it
     #[arg(long = "ignore", value_name = "PATTERN")]
     ignore: Vec<String>,
 }

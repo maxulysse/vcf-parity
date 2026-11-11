@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#6](https://github.com/maxulysse/vcf-parity/pull/6) - `@FILE` argument files, one argument per line
 - [#4](https://github.com/maxulysse/vcf-parity/pull/4) - `--tolerance FIELD=SPEC` for numeric fields: `exact`, `abs:X`, `rel:X` or `abs:X,rel:Y`, element by element for lists; checked against the header types; matches within tolerance counted in the summary
 
+### Changed
+
+- FILTER compared as a set of filters, written in sorted order
+
 ## [0.1.0](https://github.com/maxulysse/vcf-parity/releases/tag/0.1.0) - Dohko
 
 Dohko is the original Libra Gold Saint in Saint Seiya, keeper of the Libra Cloth.
