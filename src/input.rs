@@ -225,7 +225,7 @@ fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Resu
         value: if value.is_empty() { MISSING } else { value }.to_string(),
     };
     let qual = r.quality_score().transpose()?.map(|q| q.to_string());
-    // FILTER is a set: sorted so that order and repeats do not count as differences.
+    // FILTER is a set: sorted and deduplicated, so order and repeats are not differences.
     let raw = r.filters();
     let mut filters: Vec<&str> = raw.as_ref().split(';').collect();
     filters.sort_unstable();
