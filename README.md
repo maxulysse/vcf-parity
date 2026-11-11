@@ -15,10 +15,17 @@ Typical pairs of VCFs, from:
 - two platforms, for example x86_64 and ARM;
 - two releases of a caller.
 
-## Usage
+## Install
 
 ```console
 cargo install vcf-parity
+```
+
+To install the development version from `main`: `cargo install --git https://github.com/maxulysse/vcf-parity`.
+
+## Usage
+
+```console
 vcf-parity a.vcf.gz b.vcf.gz > discrepancies.tsv
 ```
 
