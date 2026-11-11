@@ -18,7 +18,7 @@ Typical pairs of VCFs, from:
 ## Usage
 
 ```console
-cargo install --git https://github.com/maxulysse/vcf-parity
+cargo install vcf-parity
 vcf-parity a.vcf.gz b.vcf.gz > discrepancies.tsv
 ```
 

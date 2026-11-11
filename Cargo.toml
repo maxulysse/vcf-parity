@@ -1,10 +1,12 @@
 [package]
 name = "vcf-parity"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Compares two VCF files record by record and field by field."
 repository = "https://github.com/maxulysse/vcf-parity"
+keywords = ["vcf", "bioinformatics", "genomics", "variant-calling", "diff"]
+categories = ["science::bioinformatics", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
