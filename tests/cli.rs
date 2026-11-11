@@ -277,3 +277,30 @@ fn ids_and_filters_are_compared_as_sets() {
          chr1\t200\tG\tT\t.\tFILTER\tdiffers\tq10\tLowGQ;q10\n"
     );
 }
+
+#[test]
+fn qual_is_compared_as_written() {
+    let out = run("qual_a.vcf", "qual_b.vcf");
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "chrom\tpos\tref\talt\tsample\tfield\tkind\tvalue_a\tvalue_b\n\
+         chr1\t100\tA\tC\t.\tQUAL\tdiffers\t1234.567\t1234.567001\n\
+         chr1\t200\tG\tT\t.\tQUAL\tdiffers\t30.0\t30\n"
+    );
+    let out = run_with("qual_a.vcf", "qual_b.vcf", &["QUAL=exact"]);
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("chr1\t100\tA\tC\t.\tQUAL"));
+    assert!(!stdout.contains("chr1\t200"));
+}
+
+#[test]
+fn unsorted_error_mentions_contigs_without_contig_lines() {
+    let out = run("undeclared_a.vcf", "undeclared_b.vcf");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("contigs without a ##contig line are ordered as first read")
+    );
+}
