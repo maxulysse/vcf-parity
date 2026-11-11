@@ -13,12 +13,13 @@ vcf-parity --version
 
 VCF or bgzipped VCF, sorted by position.
 Contig order comes from the `##contig` lines of the first file, then the second; contigs without a `##contig` line follow in order of first appearance.
-Unsorted input is an error.
+Unsorted input is an error, including a second file sorted in another contig order.
 
 ## Matching and comparison
 
 Records are matched on CHROM, POS, REF and ALT.
-Matched records are compared as text on ID, QUAL, FILTER, every INFO key, and every FORMAT key of the samples present in both files.
+Matched records are compared on ID, QUAL, FILTER, every INFO key, and every FORMAT key of the samples present in both files.
+Values are compared as text unless a [tolerance](#tolerances) applies, except FILTER, which is compared as a set: order and repeats do not count, and filters are written in sorted order.
 Samples present in one file only are reported, not compared.
 
 ## Headers
@@ -27,7 +28,6 @@ Every `##` line is compared.
 A line of the form `##KEY=<ID=X,...>` is matched on `KEY` and `ID`, then compared attribute by attribute, for example `Number`, `Type` or `Description`.
 Other lines, such as `##fileformat` or `##fileDate`, are matched on `KEY` and compared as text.
 The order of the contigs declared in both files is compared as `header/contig`.
-Records are read in the contig order of the first file, so a second file sorted in another order is an error.
 
 ## Ignored fields
 

@@ -225,10 +225,15 @@ fn flatten(r: &vcf::Record, contig: usize, sample_columns: &[usize]) -> io::Resu
         value: if value.is_empty() { MISSING } else { value }.to_string(),
     };
     let qual = r.quality_score().transpose()?.map(|q| q.to_string());
+    // FILTER is a set: sorted and deduplicated, so order and repeats are not differences.
+    let raw = r.filters();
+    let mut filters: Vec<&str> = raw.as_ref().split(';').collect();
+    filters.sort_unstable();
+    filters.dedup();
     let mut fields = vec![
         site("ID", r.ids().as_ref()),
         site("QUAL", qual.as_deref().unwrap_or(MISSING)),
-        site("FILTER", r.filters().as_ref()),
+        site("FILTER", &filters.join(";")),
     ];
 
     let info = r.info();
