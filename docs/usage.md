@@ -35,8 +35,8 @@ By default values must have identical text.
 Lists such as `AD` or `PL` match element by element and must have the same length.
 A missing value (`.`) or a value that is not a number matches only identical text.
 
-`INFO` and `FORMAT` fields must be declared `Integer` or `Float` in the headers; `ID`, `FILTER` and other types are an error.
-A field declared in neither header gives a warning.
+`INFO` and `FORMAT` fields must be declared `Integer` or `Float` in the headers; a tolerance on `ID`, `FILTER` or a field of another type is an error.
+A field declared in neither header gives a warning and the tolerance still applies.
 Differences within tolerance are not written to the TSV and do not change the exit code; the summary on stderr counts them.
 
 ## Exit codes
