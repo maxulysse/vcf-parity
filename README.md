@@ -21,7 +21,11 @@ Typical pairs of VCFs, from:
 cargo install vcf-parity
 ```
 
-To install the development version from `main`: `cargo install --git https://github.com/maxulysse/vcf-parity`.
+To install the development version from `main`:
+
+```console
+cargo install --git https://github.com/maxulysse/vcf-parity
+```
 
 ## Usage
 
