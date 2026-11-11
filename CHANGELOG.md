@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- QUAL compared as written instead of after rounding to 32-bit, which hid differences such as `1234.567` and `1234.567001` and printed values such as `30.000001` as `30.000002`; `30.0` and `30` now differ unless `--tolerance QUAL=exact` is given
-- A missing ALT (`.`) is written as `.` in the `alt` column instead of an empty cell
-- The unsorted-records error says when contigs without a `##contig` line are involved, since their order is guessed from the records
+- [#10](https://github.com/maxulysse/vcf-parity/pull/10) - QUAL compared as written instead of after rounding to 32-bit, which hid differences such as `1234.567` and `1234.567001` and printed values such as `30.000001` as `30.000002`; `30.0` and `30` now differ unless `--tolerance QUAL=exact` is given
+- [#10](https://github.com/maxulysse/vcf-parity/pull/10) - A missing ALT (`.`) is written as `.` in the `alt` column instead of an empty cell
+- [#10](https://github.com/maxulysse/vcf-parity/pull/10) - The unsorted-records error says when contigs without a `##contig` line are involved, since their order is guessed from the records
 
 ## [0.2.0](https://github.com/maxulysse/vcf-parity/releases/tag/0.2.0) - Genbu
 
